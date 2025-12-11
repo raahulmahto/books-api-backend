@@ -1,0 +1,271 @@
+openapi: 3.0.0
+info:
+  title: Books API Backend
+  version: 1.0.0
+  description: Production-level API documentation for authentication and book management.
+
+servers:
+  - url: http://localhost:5000/api/v1
+    description: Local Development Server
+
+# GLOBAL security (JWT required unless overridden)
+security:
+  - BearerAuth: []
+
+paths:
+
+  #############################
+  # AUTH ROUTES
+  #############################
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        "201":
+          description: User registered
+        "400":
+          description: Validation error
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login user and get tokens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        "200":
+          description: Login successful
+        "401":
+          description: Invalid credentials
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      security: []   # PUBLIC
+      responses:
+        "200":
+          description: New access token generated
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout user
+      responses:
+        "200":
+          description: Logout successful
+
+  #############################
+  # USER ROUTES
+  #############################
+  /users/profile:
+    get:
+      tags: [Users]
+      summary: Get current user profile
+      responses:
+        "200":
+          description: Profile fetched
+
+  #############################
+  # PROTECTED ROUTES (RBAC)
+  #############################
+  /protected/admin-panel:
+    get:
+      tags: [Protected]
+      summary: Superadmin access panel
+      responses:
+        "200":
+          description: Admin access granted
+        "403":
+          description: Forbidden
+
+  #############################
+  # BOOK ROUTES
+  #############################
+  /books:
+    get:
+      tags: [Books]
+      summary: List all books with filters, pagination, sorting
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer }
+        - in: query
+          name: limit
+          schema: { type: integer }
+        - in: query
+          name: sort
+          schema: { type: string }
+      responses:
+        "200":
+          description: Book list returned
+
+    post:
+      tags: [Books]
+      summary: Create a new book
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBookRequest'
+      responses:
+        "201":
+          description: Book created
+
+  /books/{id}:
+    get:
+      tags: [Books]
+      summary: Get book by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Book details
+
+    put:
+      tags: [Books]
+      summary: Update a book (full update)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBookRequest'
+      responses:
+        "200":
+          description: Book updated
+
+    patch:
+      tags: [Books]
+      summary: Partial update a book
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBookRequest'
+      responses:
+        "200":
+          description: Book updated
+
+    delete:
+      tags: [Books]
+      summary: Soft delete a book
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Book deleted
+
+
+  #############################
+  # BOOK STATS
+  #############################
+  /books/stats/category:
+    get:
+      tags: [Books]
+      summary: Get aggregated stats grouped by category
+      responses:
+        "200":
+          description: Stats returned
+
+
+components:
+
+  #############################
+  # JWT Security Scheme
+  #############################
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  #############################
+  # REQUEST SCHEMAS
+  #############################
+  schemas:
+
+    RegisterRequest:
+      type: object
+      required: [name, email, password]
+      properties:
+        name: { type: string }
+        email: { type: string }
+        password: { type: string }
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string }
+        password: { type: string }
+
+    CreateBookRequest:
+      type: object
+      required: [title, author, price]
+      properties:
+        title: { type: string }
+        author: { type: string }
+        description: { type: string }
+        category: { type: string }
+        price: { type: number }
+        discount: { type: number }
+        stock: { type: number }
+        images:
+          type: array
+          items: { type: string }
+        publisher: { type: string }
+        isbn: { type: string }
+        publishedYear: { type: number }
+        tags:
+          type: array
+          items: { type: string }
+
+    UpdateBookRequest:
+      type: object
+      properties:
+        title: { type: string }
+        author: { type: string }
+        description: { type: string }
+        category: { type: string }
+        price: { type: number }
+        discount: { type: number }
+        stock: { type: number }
+        images:
+          type: array
+          items: { type: string }
+        publisher: { type: string }
+        isbn: { type: string }
+        publishedYear: { type: number }
+        tags:
+          type: array
+          items: { type: string }
