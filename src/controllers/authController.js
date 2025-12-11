@@ -1,105 +1,154 @@
-const User = require("../models/userModels");
-const jwt = require("jsonwebtoken");
-const bcrypt = require("bcrypt");
-const AppError = require("../utils/AppError");
+const ApiError = require("../utils/ApiError");
 const AuthService = require("../services/authService");
+const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../utils/jwt');
+const config = require('../config');
+const ms = require('ms');
 
-exports.register = async (req, res, next) =>{
-   try {
-    const {name, email, password } = req.body;
+function sendRefreshCookie(res, token, maxAgeMs) {
+  const cookieOptions = {
+    httpOnly: true,
+    secure: config.cookie.secure,
+    sameSite: 'lax',
+    maxAge: maxAgeMs,
+    path: '/',
+    domain: config.cookie.domain || undefined,
+  };
+  res.cookie('refreshToken', token, cookieOptions);
+}
 
-    const user = await AuthService.register({name, email, password});
+function parseDurationToMs(d) {
+  if (!d) return 7 * 24 * 60 * 60 * 1000;
+  try {
+    return ms(d);
+  } catch (error) {
+    const n = Number(d);
+    if (!Number.isNaN(n)) return n;
+    return 7 * 24 * 60 * 60 * 1000;
+  }
+}
+
+async function register(req, res, next) {
+  try {
+    const { name, email, password } = req.body;
+
+    const user = await AuthService.register({ name, email, password });
 
     res.status(201).json({
       success: true,
-      message: "Registered successsfully",
-      user:{
-      id: user._id,
-      name: user.name,
-      email: user.email,
+      message: "Registered successfully",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
       },
     });
-   } catch (error) {
-       next(error);
-   }
-};
+  } catch (error) {
+    next(error);
+  }
+}
 
-exports.login = async (req, res, next) => {
+async function login(req, res, next) {
   try {
-    const {email, password} = req.body;
+    const { email, password } = req.body;
 
-    const {user, accessToken, refreshToken} = await AuthService.login(email, password);
+    const user = await AuthService.validateCredentials(email, password);
+    if (!user) return next(new ApiError(401, "Invalid credentials"));
 
-     //set cookies
-     res.cookie("refreshToken", refreshToken,{
-      httpOnly: true, 
-      accessToken,
-      sameSite: "strict",
-     });
-     //const token = generateToken(user);
+    const payload = { id: user._id.toString(), role: user.role };
+    const accessToken = signAccessToken(payload);
+    const refreshToken = signRefreshToken(payload);
 
-     return res.json({
+    const ttlMs = parseDurationToMs(config.jwt.refreshExp);
+
+    await AuthService.createRefreshToken({
+      userId: user._id,
+      token: refreshToken,
+      ip: req.ip,
+      userAgent: req.get('User-Agent') || '',
+      ttlMs,
+    });
+
+    sendRefreshCookie(res, refreshToken, ttlMs);
+
+    res.json({
       success: true,
       accessToken,
-      user: {id: user._id,
-      name: user.name,
-      email: user.email,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
       },
-     });  // this is the code to create all in one login, auth, refresh, register now we create each accordingly
+    });
   } catch (error) {
-      next(error);
+    next(error);
   }
 }
 
-exports.refreshToken = async (req, res, next) =>{
-
+async function refreshToken(req, res, next) {
   try {
-    // to match current token 
     const token = req.cookies?.refreshToken;
-    if(!token) return next(new AppError("No refresh token found", 400));
-    // to match correct token or not 
-   /* jwt.verify(token, process.env.JWT_REFRESH_SECRET, async(err, decoded) =>{
-      if(err) return res.status(401).json({message: "invalid refresh token"});
+    if (!token) return next(new ApiError(401, "No refresh token found"));
 
-      const user = await User.findById(decoded.id);
-      if(!user) return res.status(401).json({message: "user not found"});
+    const decoded = verifyRefreshToken(token);
 
-        //create new refreshtoken 
-      const accessToken = generateAccessToken(user._id);
+    const stored = await AuthService.findRefreshTokenByHash(token);
+    if (!stored || stored.revoked)
+      return next(new ApiError(401, "Invalid refresh token"));
 
-  return res.status(200).json({
-    accessToken,
-   });
-  }); */
+    await AuthService.revokeRefreshTokenByHash(token);
 
-  const decoded = await AuthService.verifyRefresh(token);
+    const payload = { id: decoded.sub, role: decoded.role };
+    const newAccess = signAccessToken(payload);
+    const newRefresh = signRefreshToken(payload);
+    const ttlMs = parseDurationToMs(config.jwt.refreshExp);
 
-  const accessToken = jwt.sign(
-    {id: decoded._id},
-    process.env.JWT_ACCESS_SECRET,
-    {expiresIn: "15m"},
-  );
-
-  res.json({accessToken});
-
-  
-  } catch (error) {
-   // return res.status(500).json({message: "server error", error: error.message});
-   next(new AppError("Invalid refresh token", 401));
-  }
-};
-
-exports.logout = (req, res) => {
-  try {
-    //clear refreshtoken cookie
-    res.clearCookie("refreshToken", {
-      httpOnly: true, 
-      secure: true, 
-      sameSite: "strict",
+    await AuthService.createRefreshToken({
+      userId: decoded.sub,
+      token: newRefresh,
+      ip: req.ip,
+      userAgent: req.get('User-Agent') || '',
+      ttlMs,
     });
 
-    return res.status(200).json({message: "logged out successfuly"});
+    sendRefreshCookie(res, newRefresh, ttlMs);
+    res.json({ success: true, accessToken: newAccess });
   } catch (error) {
-    return res.status(500).json({message: "server error", error: error.message});
+    next(new ApiError(401, "Invalid refresh token"));
   }
 }
+
+async function logout(req, res, next) {
+  try {
+    const token = req.cookies?.refreshToken;
+    if (token) {
+      await AuthService.revokeRefreshTokenByHash(token);
+    }
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: config.cookie.secure,
+      sameSite: "lax",
+      path: "/",
+      domain: config.cookie.domain || undefined,
+    });
+
+    res.json({ success: true, message: "Logged out" });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function revokeAllForUser(req, res, next) {
+  try {
+    const { userId } = req.params;
+    if (!userId) return next(new ApiError(400, "userId required"));
+
+    await AuthService.revokeAllForUser(userId);
+
+    res.json({ success: true, message: "All tokens revoked for user" });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { register, login, refreshToken, logout, revokeAllForUser };

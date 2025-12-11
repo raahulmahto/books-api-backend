@@ -1,37 +1,62 @@
-const jwt = require("jsonwebtoken");
+/*const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
-const UserRepo = require("../repositories/userRepository");
-const AppError = require("../utils/AppError");
+const UserRepo = require("../repositories/userRepository"); */
+const ApiError = require("../utils/ApiError");
+const User = require('../models/userModels');
+const RefreshToken = require('../models/refreshToken.model');
+const {hashToken} = require('../utils/logger');
+//const ms = require('ms');
 
-const generateAccessToken = (id) =>
-  jwt.sign({id}, process.env.JWT_ACCESS_TOKEN, {expiresIn: "15m"});
+async function register(name, email, password){
+  const exists = await User.findOne(email);
+  if(exists) throw new ApiError("email Already Exists", 400);
 
-const generateRefreshToken = (id) =>
-  jwt.sign({id}, process.env.JWT_REFRESH_TOKEN, {expiresIn: "7d"});
-
-exports.register = async(name, email, password) =>{
-  const exists = await UserRepo.findByEmail(email);
-  if(exists) throw new AppError("User Already Exists", 400);
-
-  const user = await UserRepo.createUser({name, email, password});
+  const user = await User.create({name, email, password});
   return user;
-};
-
-exports.login = async(email, password) =>{
-  const user = await UserRepo.findByEmail(email);
-  if(!user)
-    throw new AppError("Not found! Invalid credentials", 400);
-
-  const isMatch = await bcrypt.compare(password, user.password);
-  if(!isMatch)
-    throw new AppError("Invalid credentials", 400);
-
-  const accessToken = generateAccessToken(use._id);
-  const refreshToken = generateRefreshToken(user._id);
-
-  return (user, accessToken, refreshToken);
 }
 
-exports.verifyRefresh = async (token) =>{
-  return jwt.verify(token, process.env.JWT_REFRESH_TOKEN);
+//validate 
+async function validateCredentials(email, password){
+  const user = await User.findOne({email}.select('+password'));
+  if(!user) return null;
+  const match = await user.isPasswordMatch(password);
+  if(!match) return null;
+  return user;
+}
+
+//hashed refreshtoken
+async function createRefreshToken ({userId, token, ip, userAgent, ttlMs}){
+  const tokenHash = hashToken(token);
+  const expiresAt = new Date(Date.now() + ttlMs);
+  const doc = await RefreshToken.create({
+    user: userId,
+    tokenHash,
+    userAgent,
+    ip,
+    expiresAt,
+  });
+  return doc
+}
+
+//find refresh token
+async function findRefreshTokenByHash(token){
+  const tokenHash = hashToken(token);
+  return RefreshToken.findOne({tokenHash}).populate('user');
+}
+
+async function revokeRefreshTokenByHash(token){
+  const tokenHash = hashToken(token);
+  return RefreshToken.findOneAndUpdate({tokenHash, revoked: false},{revoked:true},{new: true});
+}
+
+async function revokeAllForUser(userId){
+  return RefreshToken.updateMany({user: userId, revoked: false}, {revoked: true}, {new: true});
+}
+module.exports = {
+  register,
+  validateCredentials,
+  createRefreshToken,
+  findRefreshTokenByHash,
+  revokeRefreshTokenByHash,
+  revokeAllForUser,
 };

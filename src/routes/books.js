@@ -1,8 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const validate = require("../middlewares/validate");
-const { bookSchema } = require("../validations/bookValidation");
-const protect = require("../middlewares/authMidlleware");
+const { bookSchema } = require("../validation/bookValidation");
+const protect = require("../middlewares/authMiddleware");
 
 const {
   getAllBooks,
