@@ -30,7 +30,7 @@ app.use(cors({
 
 //rate limiter to avoid too many attempts 
 const limiter = rateLimit({
-  windows: 15*60*1000,
+  windowMs: 15*60*1000,
   max: 100, 
   message: "Sorry too many attempts!!!!!!!!!!! please try again later",
 });
@@ -42,7 +42,7 @@ app.use(mongoSanitize());
 app.use("/api/v1/books", bookRoutes);
 app.use("/api/v1/auth", authRoutes);  //new added while registering 
 //app.use("/api/books", bookRoutes);
-app.use("/user", userRoutes);
+app.use("/user", useRoutes);
 
 //health check 
 app.get("/api/v1/health", (req,res) =>{

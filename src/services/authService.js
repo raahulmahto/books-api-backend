@@ -17,7 +17,7 @@ exports.register = async(name, email, password) =>{
   return user;
 };
 
-exports.login = asyn(email, password) =>{
+exports.login = async(email, password) =>{
   const user = await UserRepo.findByEmail(email);
   if(!user)
     throw new AppError("Not found! Invalid credentials", 400);
