@@ -73,65 +73,107 @@ exports.deleteBooks = (req, res) => {
 //COMPLETE CODE USING CONNECTORS (MONGO DB)
 const Book = require("../models/bookModels");
 
-exports.createBooks = async (req, res) => {
+exports.createBooks = async (req, res, next) => {
   try {
     const { title, author } = req.body;
     const book = await Book.create({ title, author });
-    res.status(201).json(book);
+    res.status(201).json({
+      success: true,   //improved api
+      data: book,
+    });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+   //improved api below res.status(400).json({ message: error.message }); 
+   next(error);
   }
 };
 
 //find by id books all
 
-exports.getAllBooks = async (req, res) => {
+exports.getAllBooks = async (req, res, next) => {
   try {
-    const books = await Book.find();
-    res.json(books);
+    //pagination 
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const sort = req.query.sort || "-createdAt";
+    const skip = (page-1)*limit;
+
+    //search 
+    let query = {};
+
+    if(req.query.author){
+      query.author = {$regex: req.query.author, $options: "i"};
+    }
+
+    if(req.query.search){
+      query.title = {$regex: req.query.search, $options: "i"};
+    }
+
+    const books = await Book.find()
+    .sort(sort)
+    .skip(skip)
+    .limit(limit);
+
+    const total = await Book.countDocuments();
+
+    res.json({
+      success: true,
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total/limit),
+      data: books
+    });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    next(error);
   }
 };
 
 //get book by id search
 
-exports.getBooksById = async (req, res) => {
+exports.getBooksById = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const book = await Book.findById(id);
-    if (!book) return res.status(404).json({ message: "Book not found" });
-    res.json(book);
+    // improved one below const { id } = req.params;
+    const book = await Book.findById(req.params.id);
+    if (!book) 
+      return res.status(404).json({
+       success: false, 
+       message: "Book not found" });
+    res.json({
+      success: true,
+      data: book
+    });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+     next(error);
+   // res.status(400).json({ message: error.message });
   }
 };
 
 //delete books
-exports.deleteBooks = async (req, res) => {
+exports.deleteBooks = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const deleted = await Book.findByIdAndDelete(id);
-    if (!deleted) return res.status(404).json({ message: "Book not found" });
+    const deleted = await Book.findByIdAndDelete(req.params.id);
+    if (!deleted) return res.status(404).json({ success: false, message: "Book not found" });
 
     res.json({ message: "successfully deleted" });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    //res.status(400).json({ message: error.message });
+    next(error);
   }
 };
 
 //update the code
-exports.updateBooks = async (req, res) => {
+exports.updateBooks = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const updateBook = await Book.findByIdAndUpdate(id, req.body, {
+    const updateBook = await Book.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
     });
     if (!updateBook)
-      return res.status(400).json({ message: "book not found " });
+      return res.status(400).json({ success: false, message: "book not found " });
 
-    res.json(updateBook);
+    res.json({success: true, data:updateBook});
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    //res.status(400).json({ message: error.message });
+    next(error);
   }
 };
