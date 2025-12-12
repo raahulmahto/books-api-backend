@@ -7,12 +7,14 @@ const { createBookSchema, updateBookSchema } = require('../validation/bookValida
 const auth = require('../middlewares/authMiddleware');
 const authorize = require('../middlewares/roleMiddleware');
 
-const bookController = require('../controllers/booksController');
+const bookController = require('../controllers/booksController'); 
+
+const cache = require('../cache/cacheMiddleware');
 
 // Public routes
-router.get('/', bookController.listBooks);
+router.get('/', cache(30), bookController.listBooks);      
 router.get('/stats/category', bookController.stats);
-router.get('/:id', bookController.getBookById);
+router.get('/:id', cache(60), bookController.getBookById);
 
 // Protected + role-based routes
 router.post(

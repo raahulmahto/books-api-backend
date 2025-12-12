@@ -38,9 +38,14 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // Health Check
-app.get("/api/v1/health", (req, res) => {
-  res.status(200).json({ success: true, message: "API Running" });
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: process.uptime(),
+    timestamp: Date.now()
+  });
 });
+
 
 // Swagger docs (if present)
 try {

@@ -180,7 +180,7 @@ exports.updateBooks = async (req, res, next) => {
 */
 //---------------------------------------------------------------------------
 //FULL FINAL CODE 
-
+/*
 const bookService = require('../services/bookService');
 const { buildPagination, buildSort, buildFilters } = require('../utils/queryBuilder');
 const ApiError = require('../utils/ApiError');
@@ -253,5 +253,107 @@ async function stats(req, res, next) {
   }
 }
 
+module.exports = { createBook, listBooks, getBookById, updateBook, deleteBook, stats }; */
+
+//---------------------------------------REDIS UPDATED CODE-------------------------//
+// src/controllers/bookController.js
+
+const bookService = require('../services/bookService');
+const { buildPagination, buildSort, buildFilters } = require('../utils/queryBuilder');
+const ApiError = require('../utils/ApiError');
+const { client: redis } = require('../cache/redisClient'); // <-- added
+
+// Helper: clear cache for list + specific item
+async function invalidateBookCache(bookId) {
+  try {
+    await redis.del("cache:/books");                // list endpoint (no query)
+    await redis.del(`cache:/books/${bookId}`);      // get by id
+  } catch (err) {
+    console.warn("Redis cache invalidation failed:", err.message);
+  }
+}
+
+async function createBook(req, res, next) {
+  try {
+    const ownerId = req.user?.id;
+    const book = await bookService.createBook(req.body, ownerId);
+
+    // clear list cache (new book affects list)
+    await invalidateBookCache(book._id);
+
+    res.status(201).json({ success: true, data: book });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function listBooks(req, res, next) {
+  try {
+    const { page, limit, skip } = buildPagination(req.query);
+    const { sort } = buildSort(req.query.sort);
+    const filter = buildFilters(req.query);
+
+    const { data, total } = await bookService.getList({ filter, sort, skip, limit });
+
+    res.json({
+      success: true,
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      data,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getBookById(req, res, next) {
+  try {
+    const book = await bookService.getById(req.params.id);
+    res.json({ success: true, data: book });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function updateBook(req, res, next) {
+  try {
+    const updated = await bookService.updateBook(req.params.id, req.body, req.user);
+
+    // update invalidates both list + item cache
+    await invalidateBookCache(req.params.id);
+
+    res.json({ success: true, data: updated });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function deleteBook(req, res, next) {
+  try {
+    const deleted = await bookService.deleteBook(req.params.id, req.user);
+
+    // deletion invalidates caches
+    await invalidateBookCache(req.params.id);
+
+    res.json({ success: true, data: deleted, message: 'Book deleted (soft)' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function stats(req, res, next) {
+  try {
+    const data = await bookService.statsByCategory();
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = { createBook, listBooks, getBookById, updateBook, deleteBook, stats };
+
+
+//mongodb+srv://rahulmahto0428_db_user:booksapibackend@cluster0.qtlt8fu.mongodb.net/?appName=Cluster0
 
