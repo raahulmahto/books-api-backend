@@ -3,67 +3,74 @@ const morgan = require("morgan");
 const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
 const cors = require("cors");
-const rateLimit = require("express-rate-limit");
 require("dotenv").config();
 
-// Internal imports (routes, middlewares)
+// Redis limiter
+const rateLimiter = require("./middlewares/redisRateLimiter");
+
+// Logging middlewares
+const correlation = require("./logger/correlation");
+const requestLogger = require("./logger/requestLogger");
+
+// Internal middlewares
 const errorHandler = require("./middlewares/errorMiddlewares");
 const notFound = require("./middlewares/notFound");
-
-// Routes
-const authRoutes = require("./routes/authRoutes");
-const userRoutes = require("./routes/userRoutes");
-const protectedRoutes = require("./routes/protectedRoutes");
-const bookRoutes = require("./routes/books");
 
 // Create app
 const app = express();
 
-// Security & Parsing Middleware
+/**********************************************
+ * CORE SECURITY + PARSING
+ **********************************************/
+app.use(helmet());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use(helmet());
 app.use(cors({ origin: true, credentials: true }));
 
-// Logging
+// Basic console HTTP logs (developer-friendly)
 app.use(morgan("dev"));
 
-// Rate Limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: { success: false, message: "Too many requests, try again later." },
+/**********************************************
+ * CORRELATION ID + REQUEST LOGGING
+ **********************************************/
+app.use(correlation);
+app.use(requestLogger);
+
+/**********************************************
+ * GLOBAL RATE LIMITER
+ **********************************************/
+app.use(rateLimiter({ window: 60, limit: 200 }));
+
+/**********************************************
+ * HEALTH CHECK
+ **********************************************/
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", timestamp: Date.now(), uptime: process.uptime() });
 });
-app.use(limiter);
 
-// Health Check
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    uptime: process.uptime(),
-    timestamp: Date.now()
-  });
-});
-
-
-// Swagger docs (if present)
+/**********************************************
+ * SWAGGER (optional)
+ **********************************************/
 try {
-  require('./swagger')(app);
-} catch (e) {
-  // ignore in case swagger file isn't available in minimal test env
-  // console.warn('Swagger not loaded in test environment');
-}
+  require("./swagger")(app);
+} catch {}
 
-// API Routes
-app.use("/api/v1/auth", authRoutes);
-app.use("/api/v1/users", userRoutes);
-app.use("/api/v1/books", bookRoutes);
-app.use("/api/v1/protected", protectedRoutes);
+/**********************************************
+ * VERSIONED ROUTES
+ **********************************************/
+app.use("/api/v1/auth", require("./routes/v1/authRoutes"));
+app.use("/api/v1/users", require("./routes/v1/userRoutes"));
+app.use("/api/v1/books", require("./routes/v1/books"));
+app.use("/api/v1/protected", require("./routes/v1/protectedRoutes"));
 
-// 404 + Error handlers
+// Future v2 routes
+app.use("/api/v2/books", require("./routes/v2/books"));
+
+/**********************************************
+ * NOT FOUND + ERROR HANDLING
+ **********************************************/
 app.use(notFound);
 app.use(errorHandler);
 
-// export app for server and tests
 module.exports = app;

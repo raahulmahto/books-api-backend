@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 30
+    },
+    "auditLog": "/home/rahulmahto/DevProjects/books-api-backend/books-api-backend/logs/.82e432e6736a900d04c95b1fbf662e43c9d30134-audit.json",
+    "files": [
+        {
+            "date": 1765535383000,
+            "name": "/home/rahulmahto/DevProjects/books-api-backend/books-api-backend/logs/2025-12-12-error.log",
+            "hash": "6cd53025627e0f22655eb917549866b8bd5290095da7b2ea800efa077b786c2a"
+        }
+    ],
+    "hashType": "sha256"
+}

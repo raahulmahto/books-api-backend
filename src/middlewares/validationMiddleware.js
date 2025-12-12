@@ -1,20 +1,23 @@
-const ApiError = require('../utils/ApiError');
+const ApiError = require("../utils/ApiError");
 
-const validate = (schema) => (req, res, next) => {
-  const { error, value } = schema.validate(req.body, {
-    abortEarly: false,
-    stripUnknown: true,
-  });
+const validate = (schema) => {
+  return (req, res, next) => {
+    const options = {
+      abortEarly: false,       // show all validation errors
+      allowUnknown: false,     // block unknown keys completely
+      stripUnknown: true,      // sanitize request body
+    };
 
-  if (error) {
-    return next(new ApiError(
-      400,
-      error.details.map((d) => d.message).join(', ')
-    ));
-  }
+    const { error, value } = schema.validate(req.body, options);
 
-  req.body = value; // very important
-  next();
+    if (error) {
+      const messages = error.details.map((d) => d.message).join(", ");
+      return next(new ApiError(400, messages));
+    }
+
+    req.body = value;
+    next();
+  };
 };
 
 module.exports = validate;
