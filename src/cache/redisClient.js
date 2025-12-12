@@ -33,17 +33,26 @@ module.exports = { client, connectRedis }; */
 
 let client;
 
+// below code connect to redis and return singleton client supports both ttls and non ttls
+
 async function connectRedis() {
   if (client) return client;
 
+  const url = config.redisUrl;
+  if (!url) {
+    console.warn('No redisUrl found in config; skipping redis connection');
+    return null;
+  }
+
+  const useTLS = url.startsWith('rediss://');
+
   client = redis.createClient({
-    url: config.redisUrl,
-    socket: {
-      tls: false,                  // cloud tier non-tls
-    }
+    url,
+    socket: useTLS ? { tls: true, rejectUnauthorized: false } : {}
   });
 
   client.on('error', (err) => {
+    // keep logging but do not crash the app; caching should be best-effort
     console.error('Redis error:', err);
   });
 

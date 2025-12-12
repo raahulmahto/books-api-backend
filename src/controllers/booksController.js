@@ -293,7 +293,7 @@ async function listBooks(req, res, next) {
     const { sort } = buildSort(req.query.sort);
     const filter = buildFilters(req.query);
 
-    const { data, total } = await bookService.getList({ filter, sort, skip, limit });
+    const { data, total } = await bookService.getList({ filter, sort, skip, limit, reqQuery: req.query });
 
     res.json({
       success: true,
@@ -307,6 +307,7 @@ async function listBooks(req, res, next) {
     next(err);
   }
 }
+
 
 async function getBookById(req, res, next) {
   try {
