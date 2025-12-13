@@ -9,6 +9,11 @@
             "date": 1765535382983,
             "name": "/home/rahulmahto/DevProjects/books-api-backend/books-api-backend/logs/2025-12-12-app.log",
             "hash": "269acc30c980f49f9f2f33c47ad20253e88bbca0c3e6edf976e0788f1c503f13"
+        },
+        {
+            "date": 1765616610278,
+            "name": "/home/rahulmahto/DevProjects/books-api-backend/books-api-backend/logs/2025-12-13-app.log",
+            "hash": "548513fd2948553f5eb8fe4dbdfa69701b6be9c43f049a63584236a75216d4d6"
         }
     ],
     "hashType": "sha256"

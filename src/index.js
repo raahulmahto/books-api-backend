@@ -60,7 +60,7 @@ const { connectRedis } = require("./cache/redisClient");
 
 const start = async () => {
   await connectDB();
-  await connectRedis(); // <-- ADD THIS
+  await connectRedis(); 
 
   const server = app.listen(config.port, () => {
     console.log(`Server listening on port ${config.port}`);

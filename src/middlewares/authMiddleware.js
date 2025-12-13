@@ -1,4 +1,4 @@
-// src/middlewares/auth.js
+
 const ApiError = require('../utils/ApiError');
 const { verifyAccessToken } = require('../utils/jwt');
 const User = require('../models/userModels');

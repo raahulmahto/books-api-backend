@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const validate = require('../../middlewares/validationMiddleware');
-const { createBookSchema, updateBookSchema } = require('../../validation/bookValidation');
+const { createBookSchema, updateBookSchema } = require('../../validation/v1/bookValidation');
 
 const auth = require('../../middlewares/authMiddleware');
 const authorize = require('../../middlewares/roleMiddleware');

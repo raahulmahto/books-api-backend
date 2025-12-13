@@ -356,5 +356,4 @@ async function stats(req, res, next) {
 module.exports = { createBook, listBooks, getBookById, updateBook, deleteBook, stats };
 
 
-//mongodb+srv://rahulmahto0428_db_user:booksapibackend@cluster0.qtlt8fu.mongodb.net/?appName=Cluster0
 
